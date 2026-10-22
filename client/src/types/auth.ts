@@ -3,6 +3,14 @@ import type { ToastItem } from './toast';
 
 export type AuthMode = 'signin' | 'signup';
 
+export interface AuthContextValue {
+  isAuthenticated: boolean;
+  token: string | null;
+  userId: string | null;
+  signIn: (accessToken: string, userId: string) => void;
+  signOut: () => void;
+}
+
 export interface AuthFormData {
   username: string;
   password: string;
