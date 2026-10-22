@@ -20,7 +20,7 @@ export function validateAuthFormData(
     errorMessage = 'Password is required';
   } else if (username.trim().length < 3) {
     isValid = false;
-    errorMessage = 'User name should have atleast 3 characters';
+    errorMessage = 'User name should have at least 3 characters';
   } else if (
     mode === 'signup' &&
     !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+{}[\]:;<>,.?~\\/-]).{8,}$/.test(
@@ -28,7 +28,7 @@ export function validateAuthFormData(
     )
   ) {
     isValid = false;
-    errorMessage = 'Invalid Password, try a secured passsword';
+    errorMessage = 'Invalid Password, try a secured password';
   }
   return { isValid, errorMessage };
 }
