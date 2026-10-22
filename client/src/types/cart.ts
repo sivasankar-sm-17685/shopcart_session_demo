@@ -6,16 +6,18 @@ export interface CartItem {
   quantity: number;
 }
 
-export type CartAction =
-  | { type: 'ADD_ITEM'; payload: Omit<CartItem, 'quantity'> }
-  | { type: 'REMOVE_ITEM'; payload: { id: number } }
-  | { type: 'UPDATE_QUANTITY'; payload: { id: number; quantity: number } }
-  | { type: 'CLEAR_CART' };
-
 export interface CartContextValue {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, 'quantity'>) => void;
-  removeItem: (id: number) => void;
-  updateQuantity: (id: number, quantity: number) => void;
-  clearCart: () => void;
+  isLoading: boolean;
+  isUpdatingCart: boolean;
+  error: string | null;
+  addItem: (item: Omit<CartItem, 'quantity'>) => Promise<void>;
+  removeItem: (id: number) => Promise<void>;
+  updateQuantity: (id: number, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
+}
+
+export interface GetCartResponse {
+  items: CartItem[];
+  total: number;
 }

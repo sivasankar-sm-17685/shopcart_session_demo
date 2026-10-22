@@ -3,13 +3,15 @@ interface QuantityStepperProps {
   onIncrement: () => void;
   onDecrement: () => void;
   className?: string;
+  isDisabled?: boolean;
 }
 
 function QuantityStepper({
   quantity,
   onIncrement,
   onDecrement,
-  className = ''
+  className = '',
+  isDisabled
 }: QuantityStepperProps) {
   return (
     <div className={`quantity-stepper ${className}`}>
@@ -18,6 +20,7 @@ function QuantityStepper({
         className='quantity-stepper-button'
         onClick={onDecrement}
         aria-label='Decrease quantity'
+        disabled={isDisabled}
       >
         −
       </button>
@@ -27,6 +30,7 @@ function QuantityStepper({
         className='quantity-stepper-button'
         onClick={onIncrement}
         aria-label='Increase quantity'
+        disabled={isDisabled}
       >
         +
       </button>

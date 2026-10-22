@@ -25,7 +25,13 @@ export default function ProductDetail(props: ProductDetailProps) {
   const { showToast } = props;
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { items, addItem, updateQuantity, removeItem } = useCart();
+  const {
+    items,
+    addItem,
+    updateQuantity,
+    isUpdatingCart,
+    error: cartError
+  } = useCart();
   const { productDetail, isLoading, error } = useProductDetail(Number(id));
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -34,7 +40,10 @@ export default function ProductDetail(props: ProductDetailProps) {
       showToast('failure', error);
       navigate('/products');
     }
-  }, [error, showToast, navigate]);
+    if (cartError) {
+      showToast('failure', cartError);
+    }
+  }, [error, cartError, showToast, navigate]);
 
   useEffect(() => {
     if (productDetail) {
@@ -53,11 +62,7 @@ export default function ProductDetail(props: ProductDetailProps) {
 
   const onDecrementQuantity = () => {
     if (!productDetail) return;
-    if (cartQuantity <= 1) {
-      removeItem(productDetail.id);
-    } else {
-      updateQuantity(productDetail.id, cartQuantity - 1);
-    }
+    updateQuantity(productDetail.id, cartQuantity - 1);
   };
 
   return productDetail ? (
@@ -127,7 +132,9 @@ export default function ProductDetail(props: ProductDetailProps) {
         {cartQuantity === 0 ? (
           <button
             className='product-detail-add-to-cart'
-            disabled={productDetail.availabilityStatus !== 'In Stock'}
+            disabled={
+              productDetail.availabilityStatus !== 'In Stock' || isUpdatingCart
+            }
             onClick={() => {
               addItem({
                 id: productDetail.id,
@@ -147,6 +154,7 @@ export default function ProductDetail(props: ProductDetailProps) {
               updateQuantity(productDetail.id, cartQuantity + 1)
             }
             onDecrement={onDecrementQuantity}
+            isDisabled={isUpdatingCart}
           />
         )}
 

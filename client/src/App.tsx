@@ -29,7 +29,10 @@ function App() {
             path='/products/:id'
             element={<ProductDetail showToast={showToast} />}
           ></Route>
-          <Route path='/cart' element={<CartList />}></Route>
+          <Route
+            path='/cart'
+            element={<CartList showToast={showToast} />}
+          ></Route>
         </Route>
       </Routes>
       <ToastStack onClose={closeToast} toastList={toastList} />

@@ -1,17 +1,43 @@
 // External
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 
 // Types
 import type { CartItem } from '../../types/cart';
+import type { ToastType } from '../../types/toast';
 
 // Context
 import { useCart } from '../../context/useCart';
 
 // Components
+import PageLoader from '../../components/PageLoader';
 import QuantityStepper from '../../components/QuantityStepper';
 
-function CartList() {
-  const { items, removeItem, updateQuantity, clearCart } = useCart();
+interface CartListProps {
+  showToast: (
+    status: ToastType['status'],
+    message: ToastType['message']
+  ) => void;
+}
+
+function CartList(props: CartListProps) {
+  const { showToast } = props;
+  const {
+    items,
+    isLoading,
+    isUpdatingCart,
+    error,
+    removeItem,
+    updateQuantity,
+    clearCart
+  } = useCart();
+
+  useEffect(() => {
+    if (error) {
+      showToast('failure', error);
+    }
+  }, [error, showToast]);
+
   const navigate = useNavigate();
 
   const onGoToProductListPage = () => {
@@ -23,17 +49,17 @@ function CartList() {
   };
 
   const onDecrementQuantity = (item: CartItem) => {
-    if (item.quantity <= 1) {
-      removeItem(item.id);
-    } else {
-      updateQuantity(item.id, item.quantity - 1);
-    }
+    updateQuantity(item.id, item.quantity - 1);
   };
 
   const total = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   );
+
+  if (isLoading) {
+    return <PageLoader message='Loading your cart...' />;
+  }
 
   return items.length === 0 ? (
     <div className='cart-empty'>
@@ -59,6 +85,7 @@ function CartList() {
               quantity={item.quantity}
               onIncrement={() => updateQuantity(item.id, item.quantity + 1)}
               onDecrement={() => onDecrementQuantity(item)}
+              isDisabled={isUpdatingCart}
             />
             <p className='cart-item-price'>
               ${(item.price * item.quantity).toFixed(2)}
@@ -66,6 +93,7 @@ function CartList() {
             <button
               className='cart-remove-button'
               onClick={() => removeSelectedItem(item.id)}
+              disabled={isUpdatingCart}
             >
               Remove
             </button>
@@ -74,7 +102,11 @@ function CartList() {
       </div>
       <div className='cart-summary'>
         <p className='cart-total'>Total: ${total.toFixed(2)}</p>
-        <button className='cart-clear-button' onClick={clearCart}>
+        <button
+          className='cart-clear-button'
+          onClick={clearCart}
+          disabled={isUpdatingCart}
+        >
           Clear cart
         </button>
       </div>
