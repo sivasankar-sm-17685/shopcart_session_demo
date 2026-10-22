@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { getProductById, getProducts } from '../services/productService';
+import { validateNumericParam } from '../utils/validation';
 
 export async function getProductsWithPagination(
   req: Request,
@@ -21,8 +22,8 @@ export const getSpecificProduct = async (
   next: NextFunction
 ) => {
   try {
-    const { id } = req.params;
-    const response = await getProductById(Number(id));
+    const id = validateNumericParam(req.params.id, 'product id');
+    const response = await getProductById(id);
     res.json(response);
   } catch (err) {
     next(err);
