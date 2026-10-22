@@ -11,3 +11,5 @@ export interface LoginResponse extends Omit<LoginRequest, 'password'> {
 export type SignUpRequest = LoginRequest;
 
 export type SignUpResponse = Omit<LoginRequest, 'password'> & { id: number };
+
+export type CurrentUserResponse = Omit<LoginResponse, 'accessToken'>;

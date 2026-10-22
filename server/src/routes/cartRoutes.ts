@@ -6,8 +6,11 @@ import {
   removeCartItems,
   updateCartItem
 } from '../controllers/cartController';
+import { requireAuth } from '../middleware/requireAuth';
 
 const router = Router({ mergeParams: true });
+
+router.use(requireAuth);
 
 router.get('/', getCartItems);
 router.post('/items', addItemToCart);
