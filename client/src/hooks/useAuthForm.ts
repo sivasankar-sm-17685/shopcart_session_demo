@@ -47,7 +47,7 @@ export function useAuthForm(props: AuthCardProps) {
         if (mode === 'signin') {
           const data = await loginUser(username, password);
           showToast('success', `Welcome ${username}`);
-          signIn(data.accessToken);
+          signIn(data.accessToken, String(data.id));
           navigate('/products');
         } else {
           const data = await signUpUser(username, password);
