@@ -31,3 +31,4 @@ dist-ssr
 
 #server
 */data/cart.json
+*/data/app.db
