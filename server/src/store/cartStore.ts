@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 
 import type { CartItem } from '../types/cart';
-import { ApiError } from '../utils/ApiError';
+import { ApiError } from '../utils/apiError';
 
 type CartData = Record<string, CartItem[]>;
 

@@ -1,6 +1,6 @@
 import type { ProductItemResponse, ProductsResponse } from '../types/product';
 import { THIRD_PARTY_BASE_URL } from '../config/env';
-import { ApiError } from '../utils/ApiError';
+import { ApiError } from '../utils/apiError';
 
 export async function getProducts(
   limit?: number,

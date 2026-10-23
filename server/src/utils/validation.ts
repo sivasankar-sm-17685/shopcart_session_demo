@@ -1,4 +1,4 @@
-import { ApiError } from './ApiError';
+import { ApiError } from './apiError';
 
 export function validateNumericParam(
   value: string | string[] | undefined,

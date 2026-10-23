@@ -4,7 +4,7 @@ import type {
   CurrentUserResponse
 } from '../types/auth';
 import { THIRD_PARTY_BASE_URL } from '../config/env';
-import { ApiError } from '../utils/ApiError';
+import { ApiError } from '../utils/apiError';
 
 export async function loginUser(
   username: string,

@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { getCurrentUser } from '../services/authService';
-import { ApiError } from '../utils/ApiError';
+import { ApiError } from '../utils/apiError';
 
 export async function requireAuth(
   req: Request,
