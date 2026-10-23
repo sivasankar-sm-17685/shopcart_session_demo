@@ -325,16 +325,133 @@ throw new ApiError(response.status, errorBody?.message ?? fallback)` is the
 - **`requireAuth` calls DummyJSON's `/auth/me` on every single cart request**,
   with no caching — every cart operation costs 2 sequential network round
   trips (token validation + the actual operation). Fine for this project's
-  scale; a real app would likely cache validated tokens briefly.
+  scale; a real app would likely cache validated tokens briefly. **Being
+  actively replaced right now — see "IN PROGRESS" section below, which
+  eliminates this entirely rather than caching it.**
 - **API routes are not versioned** (`/api/...`, not `/api/v1/...`) —
   deliberate: this is a BFF with exactly one first-party consumer (this
   client) that's updated in lockstep with the server, not a public API with
   external consumers who need a stable contract across versions.
 
+## 🚧 IN PROGRESS — own auth (SQLite + opaque sessions + HttpOnly cookies)
+
+Replacing DummyJSON-proxied auth entirely with the server's own user store.
+This satisfies three asks the user raised: (1) auth via cookies instead of a
+client-stored Bearer token, (2) eliminating the per-request DummyJSON
+`/auth/me` validation call, (3) owning sign-up/sign-in against a real DB
+instead of relying on DummyJSON. Turns out (3) solves (2) "for free" — once
+you verify your own session locally (a fast indexed SQL lookup), there's no
+external network call left to cache.
+
+**Locked decisions (do not re-litigate):**
+
+- DB: **SQLite** via `better-sqlite3` — confirmed feasible (SQLite CLI
+  pre-installed on the dev machine; no Postgres/MySQL-running/Docker
+  available). **Must pin to `better-sqlite3@11.9.1`** — installing with no
+  version (`npm install better-sqlite3`) resolves `latest` (currently
+  `13.0.3`), which requires **Node >=22** (this machine runs Node 18.12.0)
+  and has no prebuilt binary for that combo, falling back to a `node-gyp`
+  compile that _also_ fails (`ModuleNotFoundError: No module named
+'distutils'` — removed from Python 3.12+). v11.x has no `engines`
+  restriction and installs via prebuilt binary with zero compilation. **If
+  `npm install better-sqlite3` ever fails like this again, check this.**
+- Password hashing: Node built-in `crypto.scryptSync` (not `bcrypt` — avoids a
+  dependency), per-user random salt (`randomBytes(16)`) stored **separately**
+  from the hash, compared at verify-time via `crypto.timingSafeEqual` (not
+  `===`, to avoid timing attacks) on `Buffer.from(x, 'hex')` conversions of
+  both sides.
+- Session tokens: `crypto.randomBytes(32).toString('base64url')` (256 bits of
+  entropy, more compact than hex) — not `randomUUID()` (less entropy), not
+  JWT (avoids a signing-library dependency; opaque tokens looked up via a
+  local DB query are simpler to reason about than signature verification for
+  this project's scale).
+- No email verification for signup — username + password only, same as before.
+- Cart routes will drop `:userId` from the URL entirely once this lands
+  (`/api/cart/:userId/...` → `/api/cart/...`) — the server derives the
+  authenticated user from the session cookie itself, nothing left to compare
+  a URL param against.
+- New dependencies: `better-sqlite3` (pinned to `11.9.1`, see above) +
+  `@types/better-sqlite3`; `cookie-parser` not yet added (needed in Stage B).
+
+**Stage A (DB foundation) — ✅ fully complete and verified end-to-end.**
+
+- ✅ `server/src/config/db.ts` — opens/creates `server/data/app.db` (gitignored
+  via existing `*/data/app.db` pattern), `users`/`sessions` tables created via
+  `db.exec(...)` with `IF NOT EXISTS`. Verified working via `sqlite3
+data/app.db ".schema"`.
+- ✅ `server/src/utils/password.ts` — `hashPassword`/`verifyPassword`. **Caught
+  a real bug during review**: salt/hash variable names were initially swapped
+  inside `hashPassword` (random value assigned to `hash`, derived value
+  assigned to `salt`) — this silently breaks `verifyPassword` for every
+  password, since it re-derives using the wrong input as the salt. Fixed and
+  verified with an actual hash→verify round-trip test (correct password →
+  `true`, wrong password → `false`).
+- ✅ `server/src/store/userStore.ts` — `createUser` (catches
+  `SQLITE_CONSTRAINT_UNIQUE` → `ApiError(409, ...)`, lets anything else
+  propagate), **`findUserByName`** (not `findUserByUsername`), **`findUserById`**
+  (not `findUserByUserId`) — actual exported names, note the naming for future
+  reference. SQL column aliasing (`password_hash AS passwordHash`) used to
+  keep TS-side camelCase without manual remapping. `User` type lives in
+  `types/auth.ts`. One casing gotcha hit along the way: `utils/ApiError.ts`
+  got renamed to lowercase `apiError.ts` at some point (fixing an import
+  that was using the wrong case) — now consistent everywhere, but note the
+  actual filename is lowercase if creating new imports.
+- ✅ `server/src/store/sessionStore.ts` — `createSession` (generates token +
+  7-day expiry internally, returns the token), `findSession` (checks expiry,
+  returns `undefined` if missing/expired), `deleteSession`. **Bugs caught
+  during review**: (1) `expiresAt` was computed with `Date.now() * 7 * 24 *
+60 * 60` (multiplication — produces a nonsensical huge number) instead of
+  `Date.now() + 7 * 24 * 60 * 60 * 1000` (addition); (2) `findSession`
+  initially took an unused `userId` param, had no `return` statement, and no
+  expiry check at all; (3) `deleteSession`'s first draft tried to `SELECT`
+  columns in a `DELETE` statement (invalid SQL) and used `.get()` instead of
+  `.run()`. All fixed.
+- **End-to-end sanity test passed** (create user → find by username → verify
+  correct/wrong password → create session → find session → delete session →
+  confirm `undefined` after delete → duplicate username → `409`) — full
+  Stage A layer confirmed working together, independent of any HTTP/Express
+  layer (tested via a standalone `ts-node` script, bypassing routes/controllers
+  entirely).
+
+**Now starting Stage B** — rewriting `authService.ts` (currently still the old
+DummyJSON-proxying version, shown as the active file) to use `userStore.ts`/
+`sessionStore.ts`/`utils/password.ts` instead.
+
+**Still pending (Stages B–F):**
+
+- **Stage B** — rewrite `authService.ts`/`authController.ts` to use the DB +
+  issue the session as an HttpOnly cookie (`res.cookie(...)`) instead of
+  returning it in the JSON body; add `POST /api/auth/signout`; add
+  `cookie-parser` + `cors({ credentials: true })` to `app.ts`.
+- **Stage C** — rewrite `requireAuth.ts` to look up the session cookie
+  locally (no more DummyJSON `/auth/me` call); add `req.userId` via an
+  Express `Request` type augmentation (`types/express.d.ts`); drop `:userId`
+  from `cartRoutes.ts`/`cartController.ts` (derive from `req.userId` instead).
+- **Stage D** — rewrite `client/src/context/AuthContext.tsx`: there's no
+  longer a client-readable token at all (HttpOnly), so `isAuthenticated` can't
+  be determined synchronously from `localStorage` anymore — needs an async
+  `GET /api/auth/me` check on mount with its own loading state;
+  `ProtectedRoute.tsx` must distinguish "still checking" from "confirmed
+  logged out" to avoid a page-refresh flash-redirect bug.
+- **Stage E** — add `credentials: 'include'` to every client `fetch` call;
+  drop the `Authorization` header and `userId`/`token` params from
+  `cartApi.ts` entirely.
+- **Stage F** — full end-to-end verification: curl with cookie jars, full
+  browser flow including the page-refresh edge case, confirm session
+  isolation between different users/browsers.
+
+A full step-by-step breakdown (exact file-by-file guidance for every stage)
+exists in this conversation's session memory (`/memories/session/plan.md`)
+but that's cleared when the session ends — **this summary is the durable
+record**; re-derive specifics from the "Locked decisions" above if resuming
+this work in a new session.
+
 ## Immediate next steps (pending, not yet decided with the user)
 
-1. Write a dedicated onboarding doc for the team (original end goal of the
+1. Finish the auth migration above (Stages A–F).
+2. Write a dedicated onboarding doc for the team (original end goal of the
    whole exercise) — architecture walkthrough, key TypeScript/React/Express
    concepts demonstrated, setup instructions. Not started yet.
-2. Automated tests — none exist yet, client or server.
-3. Optional hardening — the two "known limitations" above, if ever needed.
+3. Automated tests — none exist yet, client or server.
+4. Optional hardening — the "API not versioned" known limitation above, if
+   ever needed.
