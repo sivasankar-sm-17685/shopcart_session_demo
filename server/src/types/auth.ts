@@ -1,3 +1,9 @@
+export interface User {
+  id: number;
+  username: string;
+  passwordHash: string;
+  passwordSalt: string;
+}
 export interface LoginRequest {
   username: string;
   password: string;
