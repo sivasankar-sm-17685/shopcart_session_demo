@@ -4,6 +4,13 @@ export interface User {
   passwordHash: string;
   passwordSalt: string;
 }
+export type PublicUser = Omit<User, 'passwordHash' | 'passwordSalt'>;
+
+export interface AuthResult {
+  user: PublicUser;
+  token: string;
+}
+
 export interface LoginRequest {
   username: string;
   password: string;

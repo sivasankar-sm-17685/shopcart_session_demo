@@ -8,6 +8,7 @@ export async function loginUser(
 ): Promise<LoginResponse> {
   const response = await fetch(`${baseUrl}/auth/signin`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
   });
