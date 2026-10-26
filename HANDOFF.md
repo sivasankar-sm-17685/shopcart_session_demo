@@ -13,18 +13,17 @@ storefront app: landing/auth page, product catalog, and a cart — originally
 proxying DummyJSON directly from the client, then wired through a custom
 Node/Express BFF server.
 
-**Current state (2026-10-26): mid-migration — client auth is DONE, the cart
-client is next.** Stages A–D are built and verified. Sign-in, sign-up, page
-refresh, and sign-out work in the browser against the session cookie. The
-cart client still uses the old Bearer token and `/api/cart/:userId` URLs, so
-**the cart page does not compile or work** until Stage E (see "IN PROGRESS").
-**Stage E is next.**
+**Current state (2026-10-26): auth migration DONE (Stages A–F).** Sign-in,
+sign-up, refresh, sign-out, and the cart all use the server's HttpOnly session
+cookie. Two browsers stay isolated: each signed-in user has their own session
+row and their own cart. `npx tsc --noEmit -p client/tsconfig.app.json` and
+`npm run lint` in `client/` are clean.
 
 ## Repo structure (monorepo, single git repo at `app/` root)
 
 ```
 app/
-  client/   React + TypeScript + Vite frontend (auth on the session cookie; cart still on the old token)
+  client/   React + TypeScript + Vite frontend (auth and cart both on the session cookie)
   server/   Node + TypeScript + Express backend (auth + cart both on own DB/session cookie)
     README.md   how to view / clear the SQLite DB and cart.json (sqlite3 commands)
   Readme.md top-level readme — filled in, links to this file + client/README.md
@@ -83,12 +82,11 @@ branch **`code_splitup`** — push there to persist work, same as before.
   → repeat. Re-check the file each time: a fix reported "done" was twice not
   saved yet.
 
-## `client/` — auth on the session cookie; cart still on the old token
+## `client/` — auth and cart both on the session cookie
 
-> Auth (Stage D, done) no longer keeps a token. The cart section below is still
-> the old flow: `CartContext` reads `token`/`userId` that `AuthContext` no
-> longer provides, so `npx tsc --noEmit -p tsconfig.app.json` fails only in
-> `context/CartContext.tsx` until Stage E.
+> Stages D–F are done. There is no client-readable token. Cart calls send the
+> `session` cookie (`credentials: 'include'`) and never put a user id in the
+> URL. Product fetches stay without the cookie: those routes are public.
 
 ### Architecture (layered, SOLID-influenced)
 
@@ -147,8 +145,8 @@ hot-reload.
 - `/products/:id` — single product via `GET /api/products/:id`, add-to-cart /
   quantity stepper round-trips to the server-backed cart.
 - `/cart` — reads/mutates cart via `useCart()`, which calls the server's
-  `/api/cart/:userId/...` endpoints (see Cart section below) instead of a
-  local reducer.
+  `/api/cart` and `/api/cart/items/:id` endpoints. The cookie says whose cart
+  it is.
 
 ### Auth — now a shared Context (critical lesson, read this)
 
@@ -189,11 +187,13 @@ hot-reload.
   `CartAction` (the old reducer's discriminated union) is now dead/removed —
   all business logic (reject-on-duplicate, auto-remove-at-zero) moved
   server-side; the client just reflects whatever the server returns.
-- `CartContext.tsx` — calls `useAuth()` internally for `token`/`userId`,
-  fetches the cart on mount/auth-change via a `useEffect` (standard
-  `isCancelled` pattern), and the four mutations (`addItem`/`removeItem`/
-  `updateQuantity`/`clearCart`) all call `api/cartApi.ts` and update local
-  state from the server's response.
+- `CartContext.tsx` — calls `useAuth()` only for `isAuthenticated`. When that
+  is false it clears `items`. Otherwise a `useEffect` fetches `getCart()`
+  (standard `isCancelled` pattern, check after the `await`). The four
+  mutations (`addItem`/`removeItem`/`updateQuantity`/`clearCart`) call
+  `api/cartApi.ts` with no user id and no token, and store whatever the
+  server returns. `cartApi.ts` sends `credentials: 'include'` on every call,
+  including `clearCart`, which does not read the 204 body.
 - **Lesson: don't reuse one `isLoading` flag for both the initial fetch and
   every subsequent mutation.** The original implementation did this, which
   made `CartList.tsx`'s `PageLoader` guard fire (unmounting the whole cart
@@ -339,8 +339,7 @@ more generic/accurate name for "the upstream API being proxied". Still used by
   `DELETE /api/cart/items/:id`, `DELETE /api/cart` (204). No cookie → 401;
   expired/unknown/signed-out cookie → 401; duplicate add → 409; missing item →
   404; non-numeric item id → 400. The old `/api/cart/:userId/...` URLs no
-  longer exist (404). **The client still calls the old paths with a Bearer
-  header until Stage E.**
+  longer exist (404). The client calls these cookie paths (Stage E, done).
 
 ### Key patterns/lessons already taught (server-specific)
 
@@ -499,13 +498,13 @@ Lessons from Stage B (don't re-teach from scratch):
   the controller decides the token travels as a cookie. Test: "if a mobile app
   wanted the token in the body, only the controller should change."
 - **Shared cookie options:** `SESSION_COOKIE_NAME` + `SESSION_COOKIE_OPTIONS:
-  CookieOptions` now live in `config/cookie.ts` (moved out of
+CookieOptions` now live in `config/cookie.ts` (moved out of
   `authController.ts` in Stage C so `requireAuth` can import them without
   depending on a controller); `maxAge` is added when
   setting the cookie and left OUT when calling `res.clearCookie(...)` (the
   browser only clears a cookie whose path/sameSite/etc. match). The object must
   be typed `CookieOptions` (import from `'express'`), otherwise `sameSite:
-  'lax'` widens to `string` and `res.cookie` stops compiling.
+'lax'` widens to `string` and `res.cookie` stops compiling.
 - **Cookie gotchas hit:** `path: '/me'` makes the browser send the cookie
   almost nowhere (use `'/'`); `secure: true` breaks plain `http://localhost`
   (currently `false` — **must become `true` / `NODE_ENV === 'production'`
@@ -542,7 +541,7 @@ Stage B leftovers (small, not blocking):
 a number in the address." What was done:
 
 1. `server/src/types/express.d.ts` — `export {}` + `declare global { namespace
-   Express { interface Request { userId?: number } } }`.
+Express { interface Request { userId?: number } } }`.
 2. `middleware/requireAuth.ts` rewritten (sync, cookie → `getUserFromSession` →
    `req.userId`); cookie constants moved to `config/cookie.ts`.
 3. `utils/validation.ts` got `requireUserId(userId)`; all 5 `cartController.ts`
@@ -653,14 +652,48 @@ Lessons from Stage D (don't re-teach from scratch):
 - **Don't call `response.json()` on a 204.** An empty body isn't JSON, so a
   successful sign-out would throw.
 
-**Still pending (Stages E–F):**
+**Stage E (cart client uses the session cookie) — ✅ complete, browser-verified
+2026-10-26** (written by the user, reviewed by the assistant). What was done:
 
-- **Stage E (🚧 NEXT)** — add `credentials: 'include'` to every client `fetch` call;
-  drop the `Authorization` header and `userId`/`token` params from
-  `cartApi.ts` entirely; update cart URLs to the new paths.
-- **Stage F** — full end-to-end verification: curl with cookie jars, full
-  browser flow including the page-refresh edge case, confirm session
-  isolation between different users/browsers.
+1. `cartApi.ts`: `fetchJson` dropped the `token` argument and the
+   `Authorization` header, and every cart `fetch` sends
+   `credentials: 'include'`. Paths are `GET /cart`, `POST /cart/items`,
+   `PATCH /cart/items/:id`, `DELETE /cart/items/:id`, `DELETE /cart`.
+   `clearCart` stays outside `fetchJson` because a 204 has no body.
+2. `CartContext.tsx` reads only `isAuthenticated` and calls those new
+   signatures.
+3. `productsApi.ts` was left **without** `credentials: 'include'`. Product
+   routes do not use `requireAuth`, so the cookie is not required there.
+
+Browser-verified as `test_stage_e` (then deleted): add item (badge 0 → 1),
+increase quantity (badge 2, total $19.98), open `/cart`, reload `/cart` (stays
+on the cart after a short loader), clear cart (badge 0, empty message), sign
+out back to `/`. `cart.json` showed that user's id with quantity 2 before the
+clear, and `"<id>": []` after it (the known empty-key leftover). `tsc` and
+`npm run lint` were clean.
+
+Lessons from Stage E (don't re-teach from scratch):
+
+- **Deleting the Bearer header is not enough.** On a cross-origin `fetch`
+  (page `:5173`, API `:4000`) the browser sends the cookie only when the call
+  says `credentials: 'include'`. Without it the server answers 401.
+- **`clearCart` cannot use `fetchJson`.** `fetchJson` always calls
+  `response.json()`, and a 204 body is empty, so success would throw.
+- **A public route does not need the cookie.** `productsApi.ts` works without
+  `credentials: 'include'`. Cart and auth calls do need it.
+
+**Stage F (two signed-in browsers stay isolated) — ✅ verified by the user in
+the browser and the DB, 2026-10-26.** Two separate windows (not two tabs: tabs
+share one cookie). While both were signed in, `sessions` had `user_id` 12 and
+13 (`test21`, `test22`) and `cart.json` held different items for those keys
+(Essence Mascara vs Powder Canister). `test1` and `test2` had cart data and
+**no** session row: sign-out deletes the session, not the cart.
+
+Lesson: two tabs in one browser are one cookie jar. The second sign-in
+replaces the first. Isolation needs a normal window and a private window (or
+two browsers, or two curl cookie jars).
+
+**Nothing left in the auth migration (Stages A–F).**
 
 **This summary is the durable record** — the session-memory plan files
 mentioned in earlier versions of this doc are cleared when a session ends.
@@ -669,8 +702,7 @@ a new session.
 
 ## Immediate next steps (pending, not yet decided with the user)
 
-1. Finish the auth migration above (Stages A–D done; Stage E — cart client —
-   next, then F).
+1. Auth migration is done (Stages A–F).
 2. Write a dedicated onboarding doc for the team (original end goal of the
    whole exercise) — architecture walkthrough, key TypeScript/React/Express
    concepts demonstrated, setup instructions. Not started yet.
