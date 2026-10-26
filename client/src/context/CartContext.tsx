@@ -20,14 +20,14 @@ import {
 } from '../api/cartApi';
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated, token, userId } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdatingCart, setIsUpdatingCart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated || !userId || !token) {
+    if (!isAuthenticated) {
       setItems([]);
       return;
     }
@@ -36,7 +36,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const fetchCart = async () => {
       setIsLoading(true);
       try {
-        const itemData = await getCart(userId, token);
+        const itemData = await getCart();
         if (!isCancelled) {
           setItems(itemData.items);
         }
@@ -54,15 +54,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return () => {
       isCancelled = true;
     };
-  }, [isAuthenticated, userId, token]);
+  }, [isAuthenticated]);
 
   const addItemToCart = async (item: Omit<CartItem, 'quantity'>) => {
-    if (!userId || !token) {
-      return;
-    }
     setIsUpdatingCart(true);
     try {
-      const cartItems = await addItem(userId, token, {
+      const cartItems = await addItem({
         id: item.id,
         quantity: 1
       });
@@ -81,12 +78,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     id: CartItem['id'],
     quantity: CartItem['quantity']
   ) => {
-    if (!userId || !token) {
-      return;
-    }
     setIsUpdatingCart(true);
     try {
-      const cartItems = await updateQuantity(userId, token, id, quantity);
+      const cartItems = await updateQuantity(id, quantity);
       setItems(cartItems);
       setError(null);
     } catch (err) {
@@ -97,12 +91,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const removeItemFromCart = async (id: CartItem['id']) => {
-    if (!userId || !token) {
-      return;
-    }
     setIsUpdatingCart(true);
     try {
-      const cartItems = await removeItem(userId, token, id);
+      const cartItems = await removeItem(id);
       setItems(cartItems);
       setError(null);
     } catch (err) {
@@ -115,12 +106,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const clearItemsFromCart = async () => {
-    if (!userId || !token) {
-      return;
-    }
     setIsUpdatingCart(true);
     try {
-      await clearCart(userId, token);
+      await clearCart();
       setItems([]);
       setError(null);
     } catch (err) {

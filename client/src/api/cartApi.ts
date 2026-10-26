@@ -5,16 +5,13 @@ const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
 async function fetchJson<T>(
   url: string,
-  token: string,
   options: RequestInit = {},
   errorMessage: string
 ): Promise<T> {
   const response = await fetch(url, {
     ...options,
-    headers: {
-      ...options.headers,
-      Authorization: `Bearer ${token}`
-    }
+    headers: { ...options.headers },
+    credentials: 'include'
   });
 
   if (!response.ok) {
@@ -25,26 +22,20 @@ async function fetchJson<T>(
   return response.json();
 }
 
-export function getCart(
-  userId: string,
-  token: string
-): Promise<GetCartResponse> {
+export function getCart(): Promise<GetCartResponse> {
   return fetchJson<GetCartResponse>(
-    `${baseUrl}/cart/${userId}`,
-    token,
+    `${baseUrl}/cart`,
     {},
     'Unable to fetch cart'
   );
 }
 
-export function addItem(
-  userId: string,
-  token: string,
-  item: { id: number; quantity: number }
-): Promise<CartItem[]> {
+export function addItem(item: {
+  id: number;
+  quantity: number;
+}): Promise<CartItem[]> {
   return fetchJson<CartItem[]>(
-    `${baseUrl}/cart/${userId}/items`,
-    token,
+    `${baseUrl}/cart/items`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -55,14 +46,11 @@ export function addItem(
 }
 
 export function updateQuantity(
-  userId: string,
-  token: string,
   itemId: number,
   quantity: number
 ): Promise<CartItem[]> {
   return fetchJson<CartItem[]>(
-    `${baseUrl}/cart/${userId}/items/${itemId}`,
-    token,
+    `${baseUrl}/cart/items/${itemId}`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -72,23 +60,18 @@ export function updateQuantity(
   );
 }
 
-export function removeItem(
-  userId: string,
-  token: string,
-  itemId: number
-): Promise<CartItem[]> {
+export function removeItem(itemId: number): Promise<CartItem[]> {
   return fetchJson<CartItem[]>(
-    `${baseUrl}/cart/${userId}/items/${itemId}`,
-    token,
+    `${baseUrl}/cart/items/${itemId}`,
     { method: 'DELETE' },
     'Unable to remove item from cart'
   );
 }
 
-export async function clearCart(userId: string, token: string): Promise<void> {
-  const response = await fetch(`${baseUrl}/cart/${userId}`, {
+export async function clearCart(): Promise<void> {
+  const response = await fetch(`${baseUrl}/cart`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` }
+    credentials: 'include'
   });
 
   if (!response.ok) {
