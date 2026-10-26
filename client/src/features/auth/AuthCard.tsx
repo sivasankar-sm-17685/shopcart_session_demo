@@ -1,8 +1,15 @@
+// External
+import { Navigate } from 'react-router-dom';
+
 // Types
 import type { AuthCardProps } from '../../types/auth';
 
 // Hooks
+import { useAuth } from '../../hooks/useAuth';
 import { useAuthForm } from '../../hooks/useAuthForm';
+
+// Components
+import PageLoader from '../../components/PageLoader';
 
 // Features
 import AuthForm from './AuthForm';
@@ -11,6 +18,7 @@ import AuthForm from './AuthForm';
 import '../../App.css';
 
 function AuthCard(props: AuthCardProps) {
+  const { isAuthenticated, isCheckingAuth } = useAuth();
   const {
     mode,
     username,
@@ -22,6 +30,14 @@ function AuthCard(props: AuthCardProps) {
     onPasswordChange,
     onSubmit
   } = useAuthForm(props);
+
+  if (isCheckingAuth) {
+    return <PageLoader />;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to='/products' replace />;
+  }
 
   return (
     <div className='auth-landing'>

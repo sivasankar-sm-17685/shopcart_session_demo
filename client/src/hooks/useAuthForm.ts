@@ -46,16 +46,17 @@ export function useAuthForm(props: AuthCardProps) {
         setIsSubmitting(true);
         if (mode === 'signin') {
           const data = await loginUser(username, password);
-          showToast('success', `Welcome ${username}`);
-          signIn(data.accessToken, String(data.id));
+          signIn(data);
+          showToast('success', `Welcome ${data.username}`);
           navigate('/products');
         } else {
           const data = await signUpUser(username, password);
+          signIn(data);
           showToast(
             'success',
-            `Hey ${data.username} your account has been created, Sign in to continue`
+            `Hey ${data.username} your account has been created`
           );
-          onSetMode('signin');
+          navigate('/products');
         }
         resetFormData();
       } catch (err) {

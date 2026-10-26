@@ -4,11 +4,11 @@ import type { ToastItem } from './toast';
 export type AuthMode = 'signin' | 'signup';
 
 export interface AuthContextValue {
+  user: GetMeResponse | null;
   isAuthenticated: boolean;
-  token: string | null;
-  userId: string | null;
-  signIn: (accessToken: string, userId: string) => void;
-  signOut: () => void;
+  isCheckingAuth: boolean;
+  signIn: (user: GetMeResponse) => void;
+  signOut: () => Promise<void>;
 }
 
 export interface AuthFormData {
@@ -18,15 +18,11 @@ export interface AuthFormData {
 
 export interface LoginResponse {
   id: number;
-  email: string;
   username: string;
-  accessToken: string;
 }
 
-export interface SignUpResponse {
-  id: number;
-  username: string;
-}
+export type SignUpResponse = LoginResponse;
+export type GetMeResponse = LoginResponse;
 
 export interface AuthFormProps {
   username: string;
@@ -43,4 +39,8 @@ export interface AuthCardProps {
     status: ToastItem['status'],
     message: ToastItem['message']
   ) => void;
+}
+
+export interface ProtectedRouteProps {
+  showToast: AuthCardProps['showToast'];
 }

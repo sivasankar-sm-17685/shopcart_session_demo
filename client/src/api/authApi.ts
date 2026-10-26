@@ -1,5 +1,9 @@
 // Types
-import type { LoginResponse, SignUpResponse } from '../types/auth';
+import type {
+  GetMeResponse,
+  LoginResponse,
+  SignUpResponse
+} from '../types/auth';
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
 export async function loginUser(
@@ -28,7 +32,8 @@ export async function signUpUser(
   const response = await fetch(`${baseUrl}/auth/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ username, password }),
+    credentials: 'include'
   });
 
   if (!response.ok) {
@@ -37,4 +42,32 @@ export async function signUpUser(
   }
 
   return response.json();
+}
+
+export async function getMe(): Promise<GetMeResponse | null> {
+  const response = await fetch(`${baseUrl}/auth/me`, {
+    method: 'GET',
+    credentials: 'include'
+  });
+
+  if (response.status === 401) {
+    return null;
+  }
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.message ?? 'Unable to get auth details');
+  }
+  return response.json();
+}
+
+export async function signout(): Promise<void> {
+  const response = await fetch(`${baseUrl}/auth/signout`, {
+    method: 'POST',
+    credentials: 'include'
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.message ?? 'Unable to sign out');
+  }
 }

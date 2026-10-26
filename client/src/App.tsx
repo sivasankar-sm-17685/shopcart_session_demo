@@ -23,7 +23,7 @@ function App() {
     <>
       <Routes>
         <Route path='/' element={<AuthCard showToast={showToast} />}></Route>
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute showToast={showToast} />}>
           <Route path='/products' element={<ProductList />}></Route>
           <Route
             path='/products/:id'

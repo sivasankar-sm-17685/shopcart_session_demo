@@ -1,48 +1,59 @@
 // External
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 // Types
-import type { AuthContextValue } from '../types/auth';
+import type { AuthContextValue, GetMeResponse } from '../types/auth';
 
-// Utils
-import {
-  getLocalStorageItem,
-  removeLocalStorageItem,
-  setLocalStorageItem
-} from '../utils/browser';
+// Api
+import { getMe, signout } from '../api/authApi';
 
 // Context
 import { AuthContext } from './authContextInstance';
 
-const AUTH_TOKEN_KEY = 'authToken';
-const AUTH_USER_ID_KEY = 'authUserId';
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() =>
-    getLocalStorageItem(AUTH_TOKEN_KEY)
-  );
-  const [userId, setUserId] = useState<string | null>(() =>
-    getLocalStorageItem(AUTH_USER_ID_KEY)
-  );
+  const [user, setUser] = useState<GetMeResponse | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  const signIn = (accessToken: string, newUserId: string) => {
-    setLocalStorageItem(AUTH_TOKEN_KEY, accessToken);
-    setLocalStorageItem(AUTH_USER_ID_KEY, newUserId);
-    setToken(accessToken);
-    setUserId(newUserId);
+  useEffect(() => {
+    let isCancelled = false;
+
+    const checkSession = async () => {
+      try {
+        const currentUser = await getMe();
+        if (!isCancelled) {
+          setUser(currentUser);
+        }
+      } catch {
+        if (!isCancelled) {
+          setUser(null);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsCheckingAuth(false);
+        }
+      }
+    };
+
+    checkSession();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const signIn = (nextUser: GetMeResponse) => {
+    setUser(nextUser);
   };
 
-  const signOut = () => {
-    removeLocalStorageItem(AUTH_TOKEN_KEY);
-    removeLocalStorageItem(AUTH_USER_ID_KEY);
-    setToken(null);
-    setUserId(null);
+  const signOut = async () => {
+    await signout();
+    setUser(null);
   };
 
   const value: AuthContextValue = {
-    isAuthenticated: token !== null,
-    token,
-    userId,
+    user,
+    isAuthenticated: user !== null,
+    isCheckingAuth,
     signIn,
     signOut
   };
