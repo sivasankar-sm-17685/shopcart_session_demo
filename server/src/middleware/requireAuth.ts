@@ -1,25 +1,16 @@
 import type { Request, Response, NextFunction } from 'express';
-import { getCurrentUser } from '../services/authService';
+import { getUserFromSession } from '../services/authService';
 import { ApiError } from '../utils/apiError';
+import { SESSION_COOKIE_NAME } from '../config/cookie';
 
-export async function requireAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const cookie = req.cookies[SESSION_COOKIE_NAME];
+    if (!cookie) {
       throw new ApiError(401, 'Missing authentication token');
     }
-
-    const token = authHeader.slice('Bearer '.length);
-    const currentUser = await getCurrentUser(token);
-
-    if (currentUser.id !== Number(req.params.userId)) {
-      throw new ApiError(403, "Cannot access another user's cart");
-    }
-
+    const user = getUserFromSession(cookie);
+    req.userId = user.id;
     next();
   } catch (err) {
     next(err);

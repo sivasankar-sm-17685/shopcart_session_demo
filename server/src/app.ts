@@ -16,7 +16,7 @@ app.use('/api/auth', AuthRouter);
 
 app.use('/api/products', ProductRouter);
 
-app.use('/api/cart/:userId', cartRouter);
+app.use('/api/cart', cartRouter);
 
 app.use(errorHandler);
 

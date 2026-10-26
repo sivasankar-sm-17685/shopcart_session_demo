@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction, CookieOptions } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import {
   getUserFromSession,
   loginUser,
@@ -7,14 +7,7 @@ import {
 } from '../services/authService';
 import { validateAuthCredentials } from '../utils/validation';
 import { ApiError } from '../utils/apiError';
-
-const SESSION_COOKIE_NAME = 'session';
-const SESSION_COOKIE_OPTIONS: CookieOptions = {
-  httpOnly: true,
-  sameSite: 'lax',
-  secure: false,
-  path: '/'
-};
+import { SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS } from '../config/cookie';
 
 export function signin(req: Request, res: Response, next: NextFunction) {
   try {

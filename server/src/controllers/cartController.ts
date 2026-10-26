@@ -8,6 +8,7 @@ import {
 } from '../store/cartStore';
 import { getProductById } from '../services/productService';
 import {
+  requireUserId,
   validateAddToCartBody,
   validateNumericParam,
   validateUpdateQuantityBody
@@ -19,7 +20,7 @@ export async function getCartItems(
   next: NextFunction
 ) {
   try {
-    const userId = validateNumericParam(req.params.userId, 'user id');
+    const userId = requireUserId(req.userId);
     const items = await getCart(userId);
     const total = items.reduce(
       (sum, item) => sum + item.price * item.quantity,
@@ -37,7 +38,7 @@ export async function addItemToCart(
   next: NextFunction
 ) {
   try {
-    const userId = validateNumericParam(req.params.userId, 'user id');
+    const userId = requireUserId(req.userId);
     const { id, quantity } = validateAddToCartBody(req.body);
     const itemData = await getProductById(id);
     const cartItem = {
@@ -60,7 +61,7 @@ export async function updateCartItem(
   next: NextFunction
 ) {
   try {
-    const userId = validateNumericParam(req.params.userId, 'user id');
+    const userId = requireUserId(req.userId);
     const itemId = validateNumericParam(req.params.id, 'item id');
     const { quantity } = validateUpdateQuantityBody(req.body);
     const data = await updateItem(userId, itemId, quantity);
@@ -76,7 +77,7 @@ export async function removeCartItems(
   next: NextFunction
 ) {
   try {
-    const userId = validateNumericParam(req.params.userId, 'user id');
+    const userId = requireUserId(req.userId);
     const itemId = validateNumericParam(req.params.id, 'item id');
     const data = await removeItem(userId, itemId);
     res.json(data);
@@ -91,7 +92,7 @@ export async function clearCartItems(
   next: NextFunction
 ) {
   try {
-    const userId = validateNumericParam(req.params.userId, 'user id');
+    const userId = requireUserId(req.userId);
     await clearCart(userId);
     res.status(204).send();
   } catch (err) {

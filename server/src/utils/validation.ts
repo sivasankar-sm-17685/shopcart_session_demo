@@ -57,3 +57,11 @@ export function validateAuthCredentials(body: unknown): {
 
   return { username, password };
 }
+
+export function requireUserId(userId: number | undefined): number {
+  if (userId === undefined) {
+    throw new ApiError(401, 'Missing Authentication');
+  }
+
+  return userId;
+}
