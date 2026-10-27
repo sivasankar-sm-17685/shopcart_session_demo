@@ -16,11 +16,6 @@ export interface ProductItemResponse {
   images: string[];
 }
 
-export interface ProductsRequest {
-  limit?: number;
-  skip?: number;
-}
-
 export interface ProductsResponse {
   products: ProductItemResponse[];
   total: number;

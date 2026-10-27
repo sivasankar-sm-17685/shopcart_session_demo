@@ -5,21 +5,3 @@ export interface CartItem {
   price: number;
   thumbnail: string;
 }
-
-export interface GetCartResponse {
-  items: CartItem[];
-  total: number;
-}
-
-export interface AddToCartRequest {
-  id: number;
-  quantity: number;
-}
-
-export type AddToCartResponse = CartItem;
-
-export type UpdateQuantityResponse = CartItem;
-
-export interface UpdateQuantityRequest {
-  quantity: number;
-}
