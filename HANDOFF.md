@@ -97,7 +97,9 @@ client/src/
                  not DummyJSON directly anymore.
   types/        Shared types: interfaces for object shapes, `type` unions for
                  "one of these values" (auth.ts, products.ts, cart.ts, toast.ts)
-  utils/        Pure helpers, no React (validation.ts, browser.ts for localStorage)
+  utils/        Pure helpers, no React (validation.ts). The old localStorage
+                 helpers in browser.ts were removed after auth stopped using
+                 them.
   context/      React Context for cross-tree state — TWO contexts now, both
                  following the same 3-file split per Context (Vite fast-refresh
                  friendly):
@@ -177,7 +179,7 @@ hot-reload.
   `signIn(user)` only sets state. `signOut` calls `POST /api/auth/signout`
   and clears `user` only if that succeeds (a failure rethrows, the UI stays
   signed in, and `ProtectedRoute` shows a failure toast). `localStorage` is
-  no longer used for auth (`utils/browser.ts` is now unused; left in place).
+  no longer used for auth, and `utils/browser.ts` was removed.
 
 ### Cart — server-backed (was in-memory-only)
 

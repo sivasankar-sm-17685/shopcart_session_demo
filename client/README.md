@@ -1,7 +1,11 @@
-A React + TypeScript storefront demo — a landing/auth page, a product catalog
-backed by [DummyJSON](https://dummyjson.com/), and a cart — built incrementally
-as a TypeScript learning project, and intended as an onboarding reference for
-the team.
+A React + TypeScript storefront demo — a landing/auth page, a product catalog,
+and a cart — built incrementally as a TypeScript learning project, and
+intended as an onboarding reference for the team.
+
+The client talks only to the ShopCart server (`VITE_API_BASE_URL`). Products
+are proxied from [DummyJSON](https://dummyjson.com/) by that server. Accounts
+and the cart live on the server. Sign-in stores an HttpOnly `session` cookie.
+The client never reads the token.
 
 ### Requirements
 
@@ -19,7 +23,12 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite (usually http://localhost:5173).
+Copy `.env.example` to `.env` first. Vite only exposes variables that start
+with `VITE_`, and it reads `.env` at startup, so restart the dev server after
+changing it.
+
+Open the local URL printed by Vite (usually http://localhost:5173). The API
+must already be running (see the server README).
 
 ### Available commands
 
@@ -33,23 +42,24 @@ build output are excluded from version control.
 
 ## Features
 
-- **Landing / Sign in / Sign up** (`/`) — a full-page background with a
-  centered glass-style card. Sign in and sign up share one form, switching via
-  a typed `AuthMode` union (`'signin' | 'signup'`). Sign in calls DummyJSON's
-  `/auth/login`; sign up calls `/users/add` (DummyJSON simulates account
-  creation but does not persist it, so new accounts can't be signed into
-  afterwards — sign-up success routes back to the sign-in tab).
-- **Product list** (`/products`) — fetches `https://dummyjson.com/products`
-  and renders a responsive grid with loading/error states.
-- **Product detail** (`/products/:id`) — fetches a single product, an image
-  gallery with click-to-select, derived discount pricing, stock status, and
-  policy information (warranty/shipping/returns).
-- **Cart** (`/cart`) — add/remove items and adjust quantity via a shared
-  `QuantityStepper` component, used both on the detail page and the cart page.
-- **Auth-gated routing** — `/products`, `/products/:id`, and `/cart` are
-  nested under a single `ProtectedRoute` layout route, so any new page added
-  under that route is automatically guarded with zero extra code.
-- **Toasts** — success/failure notifications with a manual close button and a
+- **Landing / Sign in / Sign up** (`/`) — sign in and sign up share one form,
+  switching via a typed `AuthMode` union (`'signin' | 'signup'`). Both call
+  the server (`POST /api/auth/signin`, `POST /api/auth/signup`). A successful
+  sign-up signs the user in and goes to `/products`, because the server sets
+  the session cookie on sign-up too. A visitor who is already signed in is
+  redirected to `/products`.
+- **Product list** (`/products`) — `GET /api/products`, rendered as a grid
+  with loading and error states.
+- **Product detail** (`/products/:id`) — one product, an image gallery,
+  discount pricing, stock status, and warranty/shipping/returns. Add to cart
+  and the quantity stepper call the server cart.
+- **Cart** (`/cart`) — add, remove, change quantity, and clear. A shared
+  `QuantityStepper` is used on the detail page and the cart page. The server
+  decides whose cart it is from the session cookie.
+- **Auth-gated routing** — `/products`, `/products/:id`, and `/cart` sit under
+  one `ProtectedRoute`. While `GET /api/auth/me` is still in flight the route
+  shows a loader, so a refresh does not bounce a signed-in user to `/`.
+- **Toasts** — success and failure notices with a close button and a
   3-second auto-dismiss timer.
 
 ## Architecture
@@ -60,14 +70,15 @@ only knows about the one below it:
 ```
 src/
   api/          Plain fetch wrappers — no React, no state. One function per
-                endpoint (e.g. loginUser, getProducts, getProductById).
+                endpoint (loginUser, getMe, getProducts, getCart, …).
+                Auth and cart calls send credentials: 'include' so the
+                browser attaches the session cookie. Product calls do not.
   types/        Shared TypeScript types — interfaces for API response shapes,
-                discriminated unions for state like AuthMode and CartAction.
-  utils/        Pure helper functions (localStorage access, form validation) —
-                no React dependency, easy to unit test in isolation.
-  context/      React Context + useReducer for state shared across unrelated
-                components (currently: the cart). Split into three files per
-                Context to keep Vite's fast-refresh happy:
+                and type unions such as AuthMode.
+  utils/        Pure helpers with no React (form validation).
+  context/      React Context for state shared across the tree (auth and
+                cart). Split into three files per Context to keep Vite's
+                fast-refresh happy:
                   - <name>ContextInstance.ts — the createContext() call only
                   - <Name>Context.tsx        — the *Provider component only
                   - use<Name>.ts             — the consumer hook only
@@ -86,13 +97,12 @@ src/
 
 ### Why it's organized this way
 
-- **Single Responsibility** — `authApi.ts` only knows how to talk to
-  DummyJSON; `validation.ts` only knows validation rules; `useAuthForm`
+- **Single Responsibility** — `authApi.ts` only knows how to call the auth
+  endpoints; `validation.ts` only knows validation rules; `useAuthForm`
   orchestrates state and calls the other two; `AuthForm`/`AuthCard` only
   render UI. Each piece can change independently.
-- **Dependency Inversion** — components call functions from `api/`/`context/`
-  hooks, never `fetch`/`localStorage` directly. Swapping DummyJSON for a real
-  backend later only touches the `api/` layer.
+- **Dependency Inversion** — components call functions from `api/` and
+  context hooks, never `fetch` directly. The server is the only backend.
 - **Interface Segregation** — shared components (`FormField`,
   `QuantityStepper`) accept only the minimal props they need, not a whole
   feature's state object.
@@ -104,19 +114,17 @@ Useful reference points if you're new to the codebase or to TypeScript:
 - **`interface` vs `type` union** — `interface` for object shapes
   (`LoginResponse`), `type` + `|` for "one of these values" (`AuthMode`,
   `ToastType['status']`).
-- **Discriminated unions for actions** — `CartAction` in `types/cart.ts` tags
-  each variant with a literal `type` field, letting `cartReducer`'s `switch`
-  narrow `action.payload` per case with no manual type guards.
 - **`import type`** — this project has `verbatimModuleSyntax` enabled, so
   type-only imports must use `import type { ... }` explicitly.
 - **Utility types** — `Omit<CartItem, 'quantity'>` derives the add-to-cart
   payload shape from `CartItem` instead of duplicating it by hand.
 - **Controlled forms** — all inputs use `value`/`onChange`, never
   uncontrolled refs.
-- **The `isCancelled` cleanup pattern** — every data-fetching hook
-  (`useProducts`, `useProductDetail`) guards against setting state after
-  unmount/re-fetch using a plain closure variable (not `useState`) flipped in
-  the `useEffect` cleanup function. See the hooks for the full reasoning.
+- **The `isCancelled` cleanup pattern** — data-fetching effects
+  (`useProducts`, `useProductDetail`, and the auth and cart providers) guard
+  against setting state after unmount or a newer fetch. A plain variable
+  inside the effect (not `useState`) is set in the cleanup, and the check
+  sits after the `await`.
 - **Custom hooks returning handlers, not raw setters** — hooks expose
   `onUsernameChange`, not `setUsername`, so consuming components depend on a
   behavioral contract rather than directly on `useState`'s setter.

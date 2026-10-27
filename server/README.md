@@ -2,6 +2,54 @@
 
 Node + TypeScript + Express backend (BFF) for the ShopCart app.
 
+Accounts and sessions live in SQLite (`server/data/app.db`). The cart is a
+JSON file (`server/data/cart.json`), keyed by user id. Product routes proxy
+[DummyJSON](https://dummyjson.com). Sign-in sets an HttpOnly `session`
+cookie. Cart routes read that cookie and do not take a user id in the URL.
+
+## Setup
+
+```bash
+npm install
+cp .env.example .env
+npm run dev
+```
+
+`.env` needs `PORT` (4000), `THIRD_PARTY_BASE_URL` (`https://dummyjson.com`),
+and `CLIENT_ORIGIN` (`http://localhost:5173`). The dev server restarts when
+source files change.
+
+`better-sqlite3` is pinned to `11.9.1` and `typescript` to `5.7.3`. Newer
+releases of both fail on the Node 18 machine this project was built with.
+See [HANDOFF.md](../HANDOFF.md).
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | Run the API with reload |
+| `npm run build` | Compile to `dist/` |
+| `npm start` | Run the compiled server |
+
+## Endpoints
+
+All paths are under `/api`. Auth and cart calls need the `session` cookie
+(`credentials: 'include'` from the browser). Product calls do not.
+
+| Method | Path | Result |
+|---|---|---|
+| POST | `/auth/signup` | 200 `{ id, username }` and a session cookie. 409 if the username is taken |
+| POST | `/auth/signin` | 200 `{ id, username }` and a session cookie. 401 for a bad username or password, with the same message either way |
+| POST | `/auth/signout` | 204. Deletes the session if the cookie is present, and always clears the cookie |
+| GET | `/auth/me` | 200 `{ id, username }`, or 401 |
+| GET | `/products` | Product list. Supports `?limit=&skip=` |
+| GET | `/products/:id` | One product |
+| GET | `/cart` | `{ items, total }` for the signed-in user |
+| POST | `/cart/items` | Body `{ id, quantity }`. 409 if that product is already in the cart |
+| PATCH | `/cart/items/:id` | Body `{ quantity }` |
+| DELETE | `/cart/items/:id` | Removes one item. 404 if it is not in the cart |
+| DELETE | `/cart` | 204. Clears the cart |
+
+A cart call with no cookie, or with an expired cookie, is 401.
+
 ## Viewing the database
 
 The auth data lives in one SQLite file, `server/data/app.db` (tables: `users`,
